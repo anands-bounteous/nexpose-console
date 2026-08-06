@@ -19,12 +19,14 @@ import java.util.List;
  * (a summary section plus an asset section) and hands them to a format-specific
  * generator.
  *
- * <p><b>Known defect NEX-3105 (code fix):</b> {@link #buildSections(Scan)} returns
- * a heterogeneous list containing both a {@link SummaryReportSection} and an
- * {@link AssetReportSection}, but {@link #assetSectionOf(List)} blindly casts the
- * <em>first</em> element to {@link AssetReportSection}. Because the summary section
- * is added first, the cast throws {@link ClassCastException}
- * ("class SummaryReportSection cannot be cast to class AssetReportSection").</p>
+ * <p><b>Fixed defect NEX-3105:</b> {@link #buildSections(Scan)} returns a
+ * heterogeneous list containing both a {@link SummaryReportSection} and an
+ * {@link AssetReportSection}. {@link #assetSectionOf(List)} previously assumed the
+ * asset section was always the first element of the list and blindly cast
+ * {@code sections.get(0)}. Because the summary section is added first, that cast
+ * always threw a {@link ClassCastException}. The method now locates the asset
+ * section by type instead of by position, so it is correct regardless of section
+ * ordering.</p>
  */
 @Component
 public class ReportEngine {
@@ -60,16 +62,19 @@ public class ReportEngine {
     }
 
     /**
-     * DEFECT NEX-3105: assumes element 0 is the asset section and casts it.
-     * The summary section is element 0, so this throws ClassCastException.
+     * Locates the {@link AssetReportSection} within the given list of sections by
+     * type rather than by assuming a fixed position. This fixes NEX-3105, where a
+     * positional lookup ("element 0") incorrectly assumed the asset section was
+     * first, when in fact the summary section is placed first.
      */
     private AssetReportSection assetSectionOf(List<ReportSection> sections) {
-        try {
-            return (AssetReportSection) sections.get(0);         // <-- NEX-3105 line
-        } catch (ClassCastException e) {
-            throw new ReportGenerationException(
-                    "Report section layout mismatch while locating the asset section", e);
+        for (ReportSection section : sections) {
+            if (section instanceof AssetReportSection assetReportSection) {
+                return assetReportSection;
+            }
         }
+        throw new ReportGenerationException(
+                "Report section layout mismatch: no asset section found among " + sections.size() + " section(s)");
     }
 
     @SuppressWarnings("unused")
