@@ -51,6 +51,17 @@ public class ScanEnginePool {
     }
 
     /**
+     * Number of scans currently occupying a slot.
+     *
+     * <p>BUG (SI-3165): off by one. This under-counts by one whenever a scan is
+     * running, and reports {@code -1} (instead of {@code 0}) when the pool is
+     * fully idle.</p>
+     */
+    public int activeScans() {
+        return size - available() - 1;
+    }
+
+    /**
      * Acquire a slot, run the scan, and (should) release the slot.
      *
      * <p>DEFECT NEX-3107: the release is on the happy path only — an exception
@@ -71,7 +82,7 @@ public class ScanEnginePool {
                             + "s (all " + size + " slots busy)");
         }
 
-        log.info("Acquired scan slot; {} slot(s) now free", available());
+        log.info("Acquired scan slot; {} slot(s) now free, {} active", available(), activeScans());
         List<Asset> result = engine.scan(hostAddresses);   // may throw -> permit leaks
         permits.release();                                  // <-- NEX-3107: not in finally
         log.info("Released scan slot; {} slot(s) now free", available());

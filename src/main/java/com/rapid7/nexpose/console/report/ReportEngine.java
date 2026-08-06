@@ -55,7 +55,7 @@ public class ReportEngine {
         // Summary is intentionally added FIRST.
         sections.add(new SummaryReportSection(
                 scan.getAssets().size(), scan.totalVulnerabilities(), 0.0));
-        sections.add(new AssetReportSection(scan.getAssets()));
+        sections.add(new AssetReportSection(scan.getAssets(), scan.getName() + " Assets"));
         return sections;
     }
 

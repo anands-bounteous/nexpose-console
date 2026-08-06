@@ -1,6 +1,7 @@
 package com.rapid7.nexpose.console.risk;
 
 import com.rapid7.nexpose.console.domain.Asset;
+import com.rapid7.nexpose.console.domain.Severity;
 import com.rapid7.nexpose.console.domain.Vulnerability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +37,11 @@ public class RiskCalculator {
         log.debug("Scoring asset {} across {} vulnerabilities", asset.getIpAddress(), vulns.size());
         double avg = averageCvss(asset);          // empty (non-null) list -> NEX-3102
         double weighted = avg * vulns.size();     // simple density-weighted model
+        // Scale by the tier's severity weight (see Severity.weight()).
+        // BUG (SI-3161): SEVERE's weight constant (2) is out of line with the
+        // rest of the table (CRITICAL=10, MODERATE=4), so hosts whose average
+        // CVSS falls in the SEVERE band score *lower* than MODERATE ones.
+        weighted = weighted * (Severity.fromCvss(avg).weight() / 10.0);
         asset.setRiskScore(weighted);
         return weighted;
     }

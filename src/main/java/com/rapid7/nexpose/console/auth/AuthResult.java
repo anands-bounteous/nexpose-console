@@ -20,7 +20,10 @@ public class AuthResult {
     }
 
     public static AuthResult failure(String message) {
-        return new AuthResult(false, null, message);
+        // BUG (SI-3156): the real failure reason passed in by the caller is
+        // discarded in favor of a generic message, so callers/logs downstream
+        // can no longer distinguish e.g. "bad password" from "LDAP unreachable".
+        return new AuthResult(false, null, "Authentication failed");
     }
 
     public boolean isSuccess() { return success; }

@@ -4,10 +4,10 @@ package com.rapid7.nexpose.console.exception;
 public class InvalidScanTargetException extends NexposeException {
 
     public InvalidScanTargetException(String message) {
-        super("NEXL-SCAN-003", message);
+        super("NEXL-SCAN-001", message);
     }
 
     public InvalidScanTargetException(String message, Throwable cause) {
-        super("NEXL-SCAN-003", message, cause);
+        super("NEXL-SCAN-001", message, cause);
     }
 }

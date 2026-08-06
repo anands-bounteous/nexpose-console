@@ -19,9 +19,17 @@ public class DomainAggregator {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (Asset asset : assets) {
             String host = asset.getHostName();
-            String domain = (host != null && host.contains("."))
-                    ? host.substring(host.indexOf('.') + 1)
-                    : "(unknown)";
+            // BUG (SI-3163): strips two labels instead of one for multi-level
+            // hostnames (e.g. "web01.corp.example.com" -> "example.com" instead
+            // of "corp.example.com"), over-coarsely merging distinct subdomains.
+            String domain;
+            if (host != null && host.contains(".")) {
+                int firstDot = host.indexOf('.');
+                int secondDot = host.indexOf('.', firstDot + 1);
+                domain = secondDot > 0 ? host.substring(secondDot + 1) : host.substring(firstDot + 1);
+            } else {
+                domain = "(unknown)";
+            }
             counts.merge(domain, 1, Integer::sum);
         }
         log.debug("Aggregated assets into {} domain bucket(s)", counts.size());
