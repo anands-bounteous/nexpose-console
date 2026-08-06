@@ -50,7 +50,8 @@ public class MockScanEngine implements ScanEngine {
             {"http-trace-method-enabled", "HTTP TRACE method enabled", "3.5", "80", "tcp"},
             {"cve-2021-44228", "Apache Log4j2 RCE (Log4Shell)", "10.0", "8080", "tcp"},
             {"cve-2017-0144", "EternalBlue SMB RCE", "9.3", "445", "tcp"},
-            {"rdp-nla-not-enabled", "RDP Network Level Authentication not enabled", "6.5", "3389", "tcp"}
+            {"rdp-nla-not-enabled", "RDP Network Level Authentication not enabled", "6.5", "3389", "tcp"},
+            {"os-missing-patch-2024-1234", "Missing OS security patch (host-based check)", "6.8", "-1", "n/a"}
     };
 
     private final String engineName;
@@ -106,6 +107,11 @@ public class MockScanEngine implements ScanEngine {
             assets.add(asset);
         }
         log.info("[{}] scan produced {} asset(s)", engineName, assets.size());
+        // BUG (SI-3160): simulated duration is a fixed constant instead of
+        // scaling with hostAddresses.size(), so this figure is meaningless for
+        // anything but very small target lists.
+        long simulatedDurationMs = 4200;
+        log.info("[{}] scan completed in {} ms (simulated)", engineName, simulatedDurationMs);
         return assets;
     }
 }

@@ -41,4 +41,14 @@ public class User {
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
     public Set<String> getRoles() { return roles; }
+
+    /**
+     * Checks whether the user carries the given role.
+     *
+     * <p>BUG (SI-3155): case-sensitive comparison. Directory role names are not
+     * guaranteed to be seeded in the same case the caller checks for.</p>
+     */
+    public boolean hasRole(String role) {
+        return roles.contains(role);
+    }
 }

@@ -16,6 +16,9 @@ public class Scan {
     private final List<String> targets = new ArrayList<>();
     private final List<Asset> assets = new ArrayList<>();
     private String failureReason;
+    // Intended report section order (e.g. ["assets","summary"]); ReportEngine
+    // does not currently honor this (see SI-3164).
+    private List<String> preferredSectionOrder = new ArrayList<>();
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -41,11 +44,21 @@ public class Scan {
     public String getFailureReason() { return failureReason; }
     public void setFailureReason(String failureReason) { this.failureReason = failureReason; }
 
+    public List<String> getPreferredSectionOrder() { return preferredSectionOrder; }
+    public void setPreferredSectionOrder(List<String> preferredSectionOrder) {
+        this.preferredSectionOrder = preferredSectionOrder;
+    }
+
     public int totalVulnerabilities() {
         int total = 0;
         for (Asset asset : assets) {
             if (asset.getVulnerabilities() != null) {
                 total += asset.getVulnerabilities().size();
+                // BUG (SI-3153): live assets are counted a second time here,
+                // inflating the aggregate total whenever a scan has live hosts.
+                if (asset.isLive()) {
+                    total += asset.getVulnerabilities().size();
+                }
             }
         }
         return total;

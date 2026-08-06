@@ -6,6 +6,17 @@ import java.util.List;
 /** Configuration for a scan request: the targets and the engine/template to use. */
 public class ScanConfig {
 
+    /**
+     * Template ids actually recognized by the scan template catalog.
+     *
+     * <p>BUG (SI-3154): the default {@link #templateId} below ("full-audit") was
+     * the pre-catalog name and was never updated when the catalog was
+     * introduced, so a scan created with defaults carries a template id that
+     * does not match any entry here.</p>
+     */
+    public static final List<String> SUPPORTED_TEMPLATE_IDS =
+            List.of("full-audit-v2", "discovery-only", "web-app-audit");
+
     private String name;
     private String templateId = "full-audit";
     private String engineName = "Local scan engine";

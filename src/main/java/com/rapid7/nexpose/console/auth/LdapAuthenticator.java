@@ -60,7 +60,15 @@ public class LdapAuthenticator implements Authenticator {
         try {
             ctx = new InitialDirContext(env);                           // throws CommunicationException
             log.info("LDAP bind succeeded for '{}'", username);
-            return AuthResult.success(directoryUser(username));
+            com.rapid7.nexpose.console.domain.User user = directoryUser(username);
+            if (!user.hasRole("user")) {
+                // BUG (SI-3155/SI-3162): directoryUser() seeds the capitalized
+                // "User" role, so this lower-case, case-sensitive check always
+                // misses it.
+                log.warn("[{}] directory user '{}' does not carry expected role 'user' (has: {})",
+                        username, username, user.getRoles());
+            }
+            return AuthResult.success(user);
         } catch (NamingException e) {
             // Misconfigured host/base DN -> CommunicationException lands here.
             log.error("LDAP bind failed for '{}' against {}: {}",
@@ -83,7 +91,25 @@ public class LdapAuthenticator implements Authenticator {
         com.rapid7.nexpose.console.domain.User u =
                 new com.rapid7.nexpose.console.domain.User(username, username);
         u.setLdap(true);
-        u.getRoles().add("user");
+        assignRoles(u, username);
         return u;
+    }
+
+    /**
+     * Maps a directory group keyword (in this POC, a substring of the username
+     * stands in for a real directory group attribute) to a console role.
+     *
+     * <p>BUG (SI-3162): uses substring matching instead of an exact group-name
+     * match, so a username like "readonly-admin-helpdesk" incorrectly picks up
+     * the "admin" role via the substring "admin".</p>
+     */
+    private void assignRoles(com.rapid7.nexpose.console.domain.User u, String username) {
+        String lower = username.toLowerCase();
+        if (lower.contains("admin")) {
+            u.getRoles().add("admin");
+        } else {
+            // NOTE: seeded as "User" (capitalized); see SI-3155.
+            u.getRoles().add("User");
+        }
     }
 }
