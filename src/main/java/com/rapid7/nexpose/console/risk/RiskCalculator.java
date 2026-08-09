@@ -12,13 +12,10 @@ import java.util.List;
 /**
  * Computes per-asset and aggregate risk scores.
  *
- * <p><b>Known defect NEX-3102:</b> {@link #averageCvss(Asset)} divides the summed
- * CVSS by {@code vulnerabilities.size()} without guarding against an empty list.
- * A live asset that has an empty (non-null) vulnerability list therefore triggers
- * an integer/real division by zero. Because {@code sum} is a {@code double}, the
- * result is {@code NaN} which then corrupts the weighted risk roll-up; and where
- * the count is taken as an {@code int} ratio it throws
- * {@link ArithmeticException}: "/ by zero".</p>
+ * <p>NEX-3102 (fixed): {@link #averageCvss(Asset)} previously divided the summed
+ * CVSS by {@code vulnerabilities.size()} without guarding against an empty list,
+ * which threw {@link ArithmeticException} for a fingerprinted asset with zero
+ * vulnerabilities. It now returns {@code 0.0} for that case.</p>
  */
 @Component
 public class RiskCalculator {
@@ -35,7 +32,7 @@ public class RiskCalculator {
             return 0.0;
         }
         log.debug("Scoring asset {} across {} vulnerabilities", asset.getIpAddress(), vulns.size());
-        double avg = averageCvss(asset);          // empty (non-null) list -> NEX-3102
+        double avg = averageCvss(asset);          // empty (non-null) list -> 0.0, no exception
         double weighted = avg * vulns.size();     // simple density-weighted model
         // Scale by the tier's severity weight (see Severity.weight()).
         // BUG (SI-3161): SEVERE's weight constant (2) is out of line with the
@@ -49,8 +46,9 @@ public class RiskCalculator {
     /**
      * Mean CVSS across an asset's vulnerabilities.
      *
-     * <p>DEFECT NEX-3102: no zero-count guard. {@code totalPenalty / count} with
-     * {@code count == 0} throws ArithmeticException (/ by zero).</p>
+     * <p>NEX-3102 (fixed): guards against a zero vulnerability count, which
+     * previously caused {@code totalPenalty / count} to throw
+     * ArithmeticException (/ by zero).</p>
      */
     public double averageCvss(Asset asset) {
         List<Vulnerability> vulns = asset.getVulnerabilities();
@@ -62,9 +60,12 @@ public class RiskCalculator {
                 count++;
             }
         }
-        // BUG: divides by count even when count == 0.
+        if (count == 0) {
+            // No vulnerabilities to average -> baseline score, no division.
+            return 0.0;
+        }
         int totalPenalty = (int) Math.round(sum * 10);
-        int perVuln = totalPenalty / count;                 // <-- NEX-3102 line ("/ by zero")
+        int perVuln = totalPenalty / count;
         log.debug("Asset {} penalty/vuln = {}", asset.getIpAddress(), perVuln);
         return sum / count;
     }
