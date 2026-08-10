@@ -9,19 +9,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Generates the XML scan report: a {@code <scan>} document listing every asset
  * and, nested under each asset, its vulnerabilities.
  *
- * <p><b>Known defect NEX-3101 (code fix):</b> {@link #appendAsset(StringBuilder, Asset)}
- * iterates {@code asset.getVulnerabilities()} with a for-each loop without first
- * checking for {@code null}. The {@link com.rapid7.nexpose.console.scan.MockScanEngine}
- * legitimately returns live-but-unfingerprinted assets whose vulnerability list is
- * {@code null}, so report generation throws {@link NullPointerException}
- * ("Cannot invoke ... because the return value of ...getVulnerabilities() is null")
- * and the whole report fails. The fix is a null-guard (treat null as empty).</p>
+ * <p><b>NEX-3101 (fixed):</b> {@link #appendAsset(StringBuilder, Asset)} now
+ * null-guards {@code asset.getVulnerabilities()}. {@link Asset} legitimately
+ * returns a {@code null} vulnerability list for live-but-unfingerprinted assets
+ * (see {@link Asset} class doc), so a missing list is treated as an empty list
+ * rather than causing a {@link NullPointerException} that aborts the whole
+ * report. This mirrors the existing null guard in
+ * {@link Scan#totalVulnerabilities()}.</p>
  */
 @Component
 public class XmlReportGenerator {
@@ -48,8 +49,6 @@ public class XmlReportGenerator {
         } catch (ReportGenerationException e) {
             throw e;
         } catch (RuntimeException e) {
-            // Wrap unexpected failures with the report error code, but the NPE
-            // below is raised inside appendAsset and rethrown here for context.
             throw new ReportGenerationException(
                     "Failed to generate XML report for scan '" + scan.getName() + "'", e);
         }
@@ -60,13 +59,19 @@ public class XmlReportGenerator {
         xml.append("    <asset ip=\"").append(XmlUtils.escape(asset.getIpAddress())).append("\" ")
            .append("host=\"").append(XmlUtils.escape(asset.getHostName())).append("\" ")
            .append("os=\"").append(XmlUtils.escape(asset.getOperatingSystem())).append("\">\n");
+
+        // NEX-3101: getVulnerabilities() is null for live-but-unfingerprinted
+        // assets; treat a null list as empty (mirrors Scan.totalVulnerabilities()).
+        List<Vulnerability> vulnerabilities = asset.getVulnerabilities();
+        if (vulnerabilities == null) {
+            vulnerabilities = Collections.emptyList();
+        }
+
         xml.append("      <vulnerabilities count=\"")
-           .append(asset.getVulnerabilities().size())          // <-- NEX-3101 (null list)
+           .append(vulnerabilities.size())
            .append("\">\n");
 
-        // BUG NEX-3101: no null check; a null vulnerability list NPEs on the
-        // for-each above (size()) and here.
-        for (Vulnerability v : asset.getVulnerabilities()) {
+        for (Vulnerability v : vulnerabilities) {
             appendVulnerability(xml, v);
         }
         xml.append("      </vulnerabilities>\n");
