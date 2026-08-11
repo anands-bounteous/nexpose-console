@@ -1,6 +1,9 @@
 # Compiled class file
 *.class
 
+# Maven build output (compiled classes, surefire reports, maven-status .lst files)
+target/
+
 # Log file
 *.log
 

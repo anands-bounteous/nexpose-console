@@ -13,13 +13,12 @@ import java.util.List;
  * considered the same host if they share an IP address (e.g. the same host seen
  * by two engines, or discovered twice in overlapping CIDR ranges).
  *
- * <p><b>Known defect NEX-3104:</b> {@link #mergeDuplicates(List)} removes elements
- * from the very list it is iterating with an enhanced for-loop. As soon as the
- * scan contains a duplicate IP, the removal mutates the backing list mid-iteration
- * and the next {@code iterator.next()} throws
- * {@link java.util.ConcurrentModificationException}. The correct approach is to
- * iterate with an explicit {@link java.util.Iterator} and call
- * {@code iterator.remove()}, or collect survivors into a new list.</p>
+ * <p>De-duplication removes repeated IPs via an explicit {@link java.util.Iterator}
+ * and {@link java.util.Iterator#remove()}, so the backing list is not structurally
+ * modified mid-iteration. This fixes NEX-3104, where removing directly from the
+ * list inside an enhanced for-loop threw
+ * {@link java.util.ConcurrentModificationException} as soon as a scan contained a
+ * duplicate IP.</p>
  */
 @Component
 public class AssetCorrelator {
@@ -30,12 +29,15 @@ public class AssetCorrelator {
         log.info("Correlating {} raw asset record(s)", assets.size());
         java.util.Set<String> seen = new java.util.HashSet<>();
         try {
-            // BUG NEX-3104: structural modification of `assets` during for-each.
-            for (Asset asset : assets) {                       // <-- CME thrown on .next()
+            // NEX-3104: remove through the Iterator so the backing list is not
+            // structurally modified mid-iteration (which threw a
+            // ConcurrentModificationException on the next Iterator.next()).
+            for (java.util.Iterator<Asset> it = assets.iterator(); it.hasNext(); ) {
+                Asset asset = it.next();
                 String ip = asset.getIpAddress();
                 if (seen.contains(ip)) {
                     log.debug("Duplicate asset {} - removing during iteration", ip);
-                    assets.remove(asset);                      // <-- NEX-3104 line
+                    it.remove();
                 } else {
                     seen.add(ip);
                 }
