@@ -6,20 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Correlates raw scan output into a de-duplicated asset set. Two assets are
  * considered the same host if they share an IP address (e.g. the same host seen
  * by two engines, or discovered twice in overlapping CIDR ranges).
- *
- * <p><b>Known defect NEX-3104:</b> {@link #mergeDuplicates(List)} removes elements
- * from the very list it is iterating with an enhanced for-loop. As soon as the
- * scan contains a duplicate IP, the removal mutates the backing list mid-iteration
- * and the next {@code iterator.next()} throws
- * {@link java.util.ConcurrentModificationException}. The correct approach is to
- * iterate with an explicit {@link java.util.Iterator} and call
- * {@code iterator.remove()}, or collect survivors into a new list.</p>
  */
 @Component
 public class AssetCorrelator {
@@ -29,21 +22,21 @@ public class AssetCorrelator {
     public List<Asset> mergeDuplicates(List<Asset> assets) {
         log.info("Correlating {} raw asset record(s)", assets.size());
         java.util.Set<String> seen = new java.util.HashSet<>();
+        List<Asset> result = new ArrayList<>();
         try {
-            // BUG NEX-3104: structural modification of `assets` during for-each.
-            for (Asset asset : assets) {                       // <-- CME thrown on .next()
+            for (Asset asset : assets) {
                 String ip = asset.getIpAddress();
                 if (seen.contains(ip)) {
-                    log.debug("Duplicate asset {} - removing during iteration", ip);
-                    assets.remove(asset);                      // <-- NEX-3104 line
+                    log.debug("Duplicate asset {} - skipping", ip);
                 } else {
                     seen.add(ip);
+                    result.add(asset);
                 }
             }
         } catch (RuntimeException e) {
             throw new CorrelationException("Failed to correlate assets during de-duplication", e);
         }
-        log.info("Correlation produced {} unique asset(s)", assets.size());
-        return assets;
+        log.info("Correlation produced {} unique asset(s)", result.size());
+        return result;
     }
 }
