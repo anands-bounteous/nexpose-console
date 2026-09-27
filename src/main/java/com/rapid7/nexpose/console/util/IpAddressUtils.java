@@ -10,13 +10,11 @@ import java.util.List;
 /**
  * Helpers for parsing and expanding scan targets (single IPs and CIDR ranges).
  *
- * <p><b>Known defect NEX-3103:</b> {@link #expandCidr(String)} splits the prefix
- * length off the CIDR string and parses it with {@link Integer#parseInt(String)}
- * without validating that the token is numeric or in range. A target such as
- * {@code "10.0.0.0/24 "} (trailing space), {@code "10.0.0.0/two"} or
- * {@code "10.0.0.0//24"} therefore throws {@link NumberFormatException} instead
- * of a friendly {@link InvalidScanTargetException}, and the raw exception
- * escapes into the scan pipeline.</p>
+ * <p>{@link #expandCidr(String)} validates the CIDR string before parsing the
+ * prefix length, so malformed input (trailing whitespace, non-numeric prefix,
+ * missing/extra '/' separators) raises a friendly
+ * {@link InvalidScanTargetException} instead of letting a raw
+ * {@link NumberFormatException} escape into the scan pipeline (NEX-3103).</p>
  */
 public final class IpAddressUtils {
 
@@ -55,26 +53,57 @@ public final class IpAddressUtils {
      * Expand a CIDR block into its member host addresses (bounded to /24 or
      * smaller for this POC).
      *
-     * <p>DEFECT NEX-3103: the prefix token is parsed directly without a numeric
-     * guard, so malformed input raises {@link NumberFormatException}.</p>
+     * <p>The prefix token is validated to be a plain, non-negative integer
+     * before parsing. Any malformed CIDR (e.g. trailing whitespace, extra
+     * '/' characters, or a non-numeric prefix such as "10.0.0.0/2a") results
+     * in an {@link InvalidScanTargetException} rather than an unchecked
+     * {@link NumberFormatException}.</p>
      */
     public static List<String> expandCidr(String cidr) {
         log.debug("Expanding CIDR target '{}'", cidr);
-        String[] parts = cidr.split("/");
-        String base = parts[0];
 
-        // BUG: no validation that parts.length == 2 or that parts[1] is numeric.
-        // Trailing whitespace / non-numeric prefixes blow up here at runtime.
-        int prefix = Integer.parseInt(parts[1]);          // <-- NEX-3103 line
+        if (cidr == null) {
+            throw new InvalidScanTargetException("CIDR target must not be null");
+        }
+
+        String[] parts = cidr.split("/");
+        if (parts.length != 2) {
+            throw new InvalidScanTargetException("Malformed CIDR target: " + cidr);
+        }
+
+        String base = parts[0];
+        String prefixToken = parts[1];
+
+        if (!prefixToken.matches("\\d+")) {
+            throw new InvalidScanTargetException("Malformed CIDR prefix in target: " + cidr);
+        }
+
+        int prefix;
+        try {
+            prefix = Integer.parseInt(prefixToken);
+        } catch (NumberFormatException e) {
+            throw new InvalidScanTargetException("Malformed CIDR prefix in target: " + cidr, e);
+        }
 
         if (prefix < 24 || prefix > 32) {
             throw new InvalidScanTargetException(
                     "Unsupported CIDR prefix /" + prefix + " (POC supports /24-/32): " + cidr);
         }
+
         String[] octets = base.split("\\.");
+        if (octets.length != 4) {
+            throw new InvalidScanTargetException("Malformed CIDR base address in target: " + cidr);
+        }
+
+        int lastOctetBase;
+        try {
+            lastOctetBase = Integer.parseInt(octets[3]);
+        } catch (NumberFormatException e) {
+            throw new InvalidScanTargetException("Malformed CIDR base address in target: " + cidr, e);
+        }
+
         int hostBits = 32 - prefix;
         int count = (1 << hostBits);
-        int lastOctetBase = Integer.parseInt(octets[3]);
 
         List<String> hosts = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
