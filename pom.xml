@@ -53,6 +53,15 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Lets JUnit 4-style tests (org.junit.Test / org.junit.Assert) compile and
+             run alongside JUnit 5. The automated triage agent emits either dialect;
+             without this a JUnit 4 test fails the CI gate and the pull request is
+             abandoned. Version is managed by spring-boot-starter-parent. -->
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
