@@ -18,8 +18,7 @@ public final class XmlUtils {
                 case '<' -> sb.append("&lt;");
                 case '>' -> sb.append("&gt;");
                 case '"' -> sb.append("&quot;");
-                // NOTE (SI-3151): apostrophes are intentionally left unescaped here
-                // pending a decision on quote style; see ticket for the malformed-XML impact.
+                case '\'' -> sb.append("&apos;");
                 default -> sb.append(c);
             }
         }
